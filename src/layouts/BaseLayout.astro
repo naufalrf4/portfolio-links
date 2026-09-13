@@ -1,0 +1,141 @@
+---
+import '../styles/globals.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  canonicalUrl: string;
+}
+
+const SITE_NAME = 'NaufalRF Portfolio';
+
+const {
+  title,
+  description = 'NaufalRF Links - A central hub of official links.',
+  canonicalUrl,
+} = Astro.props;
+
+const formattedTitle = title === SITE_NAME ? SITE_NAME : `${title} - ${SITE_NAME}`;---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <script is:inline>
+      (function () {
+        var theme = 'dark';
+        try {
+          var stored = localStorage.getItem('theme');
+          if (stored === 'light' || stored === 'dark') theme = stored;
+        } catch (e) {
+          
+        }
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <meta name="description" content={description} />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <meta name="generator" content={Astro.generator} />
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:title" content={formattedTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl} />
+    <link rel="canonical" href={canonicalUrl} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={formattedTitle} />
+    <meta name="twitter:description" content={description} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <slot name="head" />
+    <title>{formattedTitle}</title>
+  </head>
+  <body class="bg-background text-foreground antialiased min-h-screen">
+    <slot />
+    <script is:inline>
+      {`
+        (function () {
+          if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+          function getSessionId() {
+            try {
+              const key = 'links_analytics_session';
+              const existing = window.localStorage.getItem(key);
+              if (existing) return existing;
+              const next = 'links-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+              window.localStorage.setItem(key, next);
+              return next;
+            } catch {
+              return 'links-session';
+            }
+          }
+
+          function getTimezone() {
+            try {
+              return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+            } catch {
+              return '';
+            }
+          }
+
+          function sendAnalytics(payload) {
+            const body = JSON.stringify(payload);
+
+            if (navigator.sendBeacon) {
+              const blob = new Blob([body], { type: 'application/json' });
+              navigator.sendBeacon('/api/analytics', blob);
+              return;
+            }
+
+            fetch('/api/analytics', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body,
+              keepalive: true,
+            }).catch(function () {});
+          }
+
+          sendAnalytics({
+            page: window.location.pathname || '/',
+            eventType: 'pageview',
+            entityType: 'page',
+            entityId: window.location.pathname || '/',
+            userSession: getSessionId(),
+            timezone: getTimezone(),
+            data: {
+              title: document.title,
+              url: window.location.href,
+            },
+          });
+
+          document.addEventListener('click', function (event) {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+
+            const anchor = target.closest('[data-analytics-link]');
+            if (!(anchor instanceof HTMLAnchorElement)) return;
+
+            sendAnalytics({
+              page: window.location.pathname || '/',
+              eventType: 'click',
+              entityType: anchor.dataset.entityType || 'link',
+              entityId: anchor.dataset.entityId || anchor.href,
+              userSession: getSessionId(),
+              timezone: getTimezone(),
+              data: {
+                label: anchor.dataset.entityLabel || anchor.textContent?.trim() || anchor.href,
+                url: anchor.dataset.entityUrl || anchor.href,
+              },
+            });
+          }, { passive: true });
+        })();
+      `}
+    </script>
+  </body>
+</html>

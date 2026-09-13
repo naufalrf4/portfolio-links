@@ -1,0 +1,125 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ErrorState from '../components/ErrorState.astro';
+import { LivePresencePill } from '../components/LivePresencePill';
+import { ThemeToggler } from '../components/ThemeToggler';
+import ProfileHeader from '../components/ProfileHeader.astro';
+import LinkButtons from '../components/LinkButtons.astro';
+import SocialIcons from '../components/SocialIcons.astro';
+import { getLinksPageData, logger } from '../lib/api';
+import { detectSocialPlatform, isSocialProfileLink, normalizeUrl } from '../lib/link-classification';
+import type { AboutData, ProfileLink, SocialLink } from '../types';
+
+const currentYear = new Date().toLocaleDateString('en-CA', {
+  year: 'numeric',
+  timeZone: 'Asia/Jakarta',
+});
+
+const fallbackAboutData: AboutData = {
+  fullName: 'NaufalRF',
+  tagline: 'Full-Stack Engineer',
+  bio: 'Building scalable web applications. Open to collaboration and opportunities.',
+  avatarUrl: null,
+  socialLinks: [],
+};
+
+let aboutData = fallbackAboutData;
+let links: ProfileLink[] = [];
+let errorMessage: string | null = null;
+
+try {
+  const pageData = await getLinksPageData();
+  aboutData = pageData.aboutData;
+  links = pageData.links;
+} catch (error) {
+  logger.error('Failed to load profile links', error);
+  errorMessage = 'Failed to load links. Please try again later.';
+}
+
+const allSocialLinks: SocialLink[] = links
+  .flatMap((link) => {
+    const platform = detectSocialPlatform(link);
+    if (!platform) {
+      return [];
+    }
+
+    return [
+      {
+        platform,
+        url: link.url,
+        label: link.label,
+        icon: link.icon,
+      },
+    ];
+  });
+
+const socialLinkUrls = new Set(allSocialLinks.map((link) => normalizeUrl(link.url)));
+const websiteLinks = links.filter(
+  (link) => !isSocialProfileLink(link) && !socialLinkUrls.has(normalizeUrl(link.url))
+);
+const presenceSocketUrl =
+  process.env.PUBLIC_CURSOR_WS_URL?.trim() || import.meta.env.PUBLIC_CURSOR_WS_URL?.trim() || 'ws://localhost:3006/ws';---
+
+<BaseLayout
+  title="Links"
+  description="A central hub of official links by Naufal Rizqullah Firdaus including portfolio, GitHub, LinkedIn, automation projects, IoT systems, blogs, and contact details."
+  canonicalUrl="https://links.naufalrf.net"
+>
+  <Fragment slot="head">
+    <script
+      type="application/ld+json"
+      set:html={JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Person',
+        name: aboutData.fullName || 'Naufal Rizqullah Firdaus',
+        alternateName: 'NaufalRF',
+        url: 'https://links.naufalrf.net',
+        description:
+          aboutData.bio ||
+          'Official profile links for Naufal Rizqullah Firdaus, full-stack engineer and builder of web, automation, and AI-powered systems.',
+        sameAs: allSocialLinks.map((link) => link.url),
+      })}
+    />
+  </Fragment>
+  <LivePresencePill client:load socketUrl={presenceSocketUrl} pagePath="/links" pageLabel="Links" />
+  <div class="fixed right-4 top-4 z-50">
+    <ThemeToggler client:load />
+  </div>
+  <main class="relative min-h-screen overflow-hidden bg-background px-4 py-10 sm:px-5 sm:py-12">
+    <div class="pointer-events-none absolute inset-0">
+      <div class="absolute left-[-6rem] top-10 h-48 w-48 rounded-full bg-[radial-gradient(circle,var(--teal-glow),transparent_68%)] blur-2xl"></div>
+      <div class="absolute right-[-4rem] top-1/4 h-56 w-56 rounded-full bg-[radial-gradient(circle,var(--amber-soft),transparent_72%)] blur-3xl"></div>
+      <div class="absolute bottom-[-3rem] left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,var(--teal-soft),transparent_70%)] blur-3xl"></div>
+    </div>
+
+    <section class="relative mx-auto flex w-full max-w-[40rem] flex-col gap-7 shape-container border border-[var(--border)] bg-[var(--bg-card)] px-5 py-8 surface-raised sm:px-7 sm:py-9 lg:max-w-[44rem] lg:px-8">
+      {errorMessage ? (
+        <ErrorState message={errorMessage} />
+      ) : (
+        <>
+          <ProfileHeader
+            name={aboutData.fullName}
+            tagline={aboutData.tagline ?? undefined}
+            bio={aboutData.bio ?? ''}
+            avatarUrl={aboutData.avatarUrl ?? undefined}
+          />
+          {allSocialLinks.length > 0 && (
+            <div class="flex justify-center pt-1">
+              <SocialIcons links={allSocialLinks} />
+            </div>
+          )}
+          {websiteLinks.length > 0 && (
+            <div class="w-full">
+              <LinkButtons links={websiteLinks} />
+            </div>
+          )}
+          <footer class="pt-2 text-center">
+            <p class="text-sm text-foreground-muted">
+              © {currentYear} Naufal Rizqullah Firdaus.
+            </p>
+          </footer>
+        </>
+      )}
+    </section>
+  </main>
+</BaseLayout>

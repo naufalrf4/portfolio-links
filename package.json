@@ -1,0 +1,32 @@
+{
+  "name": "links-astro",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev --host 0.0.0.0 --port 3002",
+    "build": "astro build",
+    "preview": "astro preview --host 0.0.0.0 --port 3002",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/node": "^9.5.4",
+    "@astrojs/react": "^4.4.2",
+    "@astrojs/sitemap": "^3.7.0",
+    "astro": "^5.17.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.575.0",
+    "tailwind-merge": "^3.5.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "@naufalrf/http": "workspace:*",
+    "@naufalrf/contracts": "workspace:*",
+    "@naufalrf/design-tokens": "workspace:*"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3"
+  }
+}

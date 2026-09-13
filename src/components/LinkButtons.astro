@@ -1,0 +1,75 @@
+---
+import type { ProfileLink } from '../types';
+import { getWebsiteLinkKind } from '../lib/link-classification';
+
+interface Props {
+  links: ProfileLink[];
+}
+
+const { links } = Astro.props;
+
+const icons = {
+  briefcase: `<rect width="20" height="14" x="2" y="6" rx="2" /><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />`,
+  'book-open': `<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />`,
+  'file-text': `<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8" /><path d="M16 13H8" /><path d="M16 17H8" />`,
+  code: `<polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />`,
+  globe: `<circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /><path d="M2 12h20" />`,
+  'external-link': `<path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />`
+};---
+
+<div class="w-full flex flex-col gap-3.5 md:gap-4">
+  {links.map((link, index) => {
+    const iconType = getWebsiteLinkKind(link);
+    const svgPath = icons[iconType as keyof typeof icons] || icons.globe;
+    const delay = `${index * 0.1}s`;
+
+    return (
+      <a
+        href={link.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-analytics-link
+        data-entity-type="profile_link"
+        data-entity-id={link.id}
+        data-entity-label={link.label}
+        data-entity-url={link.url}
+        class="group flex items-center p-3.5 md:px-5 md:py-4 bg-surface shape-container surface-raised hover:surface-raised-hover active:surface-sunken motion-base transform hover:-translate-y-1"
+        style={`animation-delay: ${delay}`}
+      >
+        <div class="w-10 h-10 md:w-11 md:h-11 avatar-round bg-surface surface-sunken-sm flex items-center justify-center mr-3.5 text-accent group-hover:scale-110 motion-base">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="w-5 h-5"
+            set:html={svgPath}
+          />
+        </div>
+        <span class="flex-1 font-semibold text-center text-[15px] md:text-base text-foreground/90 group-hover:text-foreground motion-base font-sans">
+          {link.label}
+        </span>
+        <div class="w-8 flex justify-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="w-4 h-4 text-foreground-muted opacity-0 group-hover:opacity-100 motion-base group-hover:translate-x-0.5"
+            set:html={icons['external-link']}
+          />
+        </div>
+      </a>
+    );
+  })}
+</div>
