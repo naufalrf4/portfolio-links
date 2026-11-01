@@ -1,33 +1,33 @@
 # syntax=docker/dockerfile:1.7
-# Built by the parent repository with its root workspace as the Docker context.
-FROM docker.io/oven/bun:1.4.3 AS dev
-WORKDIR /app
-CMD ["sh", "-lc", "bun install --frozen-lockfile && bun run dev"]
-
 FROM docker.io/oven/bun:1.4.3 AS builder
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY packages ./packages
-COPY apps/admin/package.json ./apps/admin/package.json
-COPY apps/public-astro/package.json ./apps/public-astro/package.json
-COPY apps/links-astro/package.json ./apps/links-astro/package.json
-COPY apps/ngl-svelte/package.json ./apps/ngl-svelte/package.json
-COPY apps/rag-service/package.json ./apps/rag-service/package.json
-COPY apps/live-presence/package.json ./apps/live-presence/package.json
-COPY e2e/package.json ./e2e/package.json
-RUN --mount=type=cache,id=bun-install-cache,target=/root/.bun/install/cache \
+RUN --mount=type=cache,id=links-bun-install,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
-COPY apps/links-astro ./apps/links-astro
-WORKDIR /app/apps/links-astro
+COPY . .
 RUN bun run build
 
-FROM docker.io/oven/bun:1.4.3 AS prod
-WORKDIR /app/apps/links-astro
+FROM docker.io/oven/bun:1.4.3 AS prod-deps
+WORKDIR /app
+ENV NODE_ENV=production
+COPY package.json bun.lock ./
+COPY packages ./packages
+RUN --mount=type=cache,id=links-bun-install,target=/root/.bun/install/cache \
+    bun install --production --frozen-lockfile
+
+FROM docker.io/oven/bun:1.4.3 AS dev
+WORKDIR /app
+CMD ["sh", "-lc", "bun install --frozen-lockfile && bun run dev"]
+
+FROM docker.io/library/node:22-bookworm-slim AS prod
+WORKDIR /app
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3002
-COPY --from=builder /app/node_modules /app/node_modules
-COPY --from=builder /app/apps/links-astro/package.json ./package.json
-COPY --from=builder /app/apps/links-astro/dist ./dist
+COPY --from=prod-deps /app/package.json ./package.json
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/packages ./packages
+COPY --from=builder /app/dist ./dist
 EXPOSE 3002
-CMD ["bun", "./dist/server/entry.mjs"]
+CMD ["node", "./dist/server/entry.mjs"]
