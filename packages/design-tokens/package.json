@@ -1,0 +1,8 @@
+{
+  "name": "@naufalrf/design-tokens",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    ".": "./tokens.css"
+  }
+}
