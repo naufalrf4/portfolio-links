@@ -20,7 +20,7 @@ Set these for both Preview and Production, using the correct URL for each enviro
 | `ADMIN_API_URL` | server variable | `https://admin.naufalrf.net`; SSR and analytics API proxy target. |
 | `ADMIN_INTERNAL_API_TOKEN` | secret | Least-privilege Admin token for server-side log shipping. Never expose to browser code. |
 | `SITE_URL` | build/runtime variable | `https://links.naufalrf.net`; Astro site and sitemap origin. The Links page canonical and JSON-LD URLs currently point directly to the production hostname. |
-| `PUBLIC_CURSOR_WS_URL` | public value | `wss://presence.naufalrf.net/ws`. |
+| `PUBLIC_CURSOR_WS_URL` | public value | `wss://admin.naufalrf.net/presence/ws`; Traefik routes this path to the internal Live Presence service. |
 
 Astro Cloudflare selects a `SESSION` KV driver by default, but this app does not call Astro's server session API and local Pages SSR passed without that binding. Keep it unconfigured unless a route starts using `Astro.session`; if that changes, declare the KV binding in Wrangler config and verify Preview. Add each exact Preview origin to Admin's public-origin list and Live Presence's origin allowlist before testing cross-host calls; keep these allowlists explicit. Local Wrangler secrets belong in `.dev.vars`; the file is ignored by Git.
 
