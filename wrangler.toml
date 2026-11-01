@@ -2,3 +2,16 @@ name = "naufalrf-links"
 compatibility_date = "2026-10-30"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "./dist"
+keep_vars = true
+
+[vars]
+ADMIN_API_URL = "https://admin.naufalrf.net"
+BUN_VERSION = "1.4.3"
+PUBLIC_CURSOR_WS_URL = "wss://presence.naufalrf.net/ws"
+SITE_URL = "https://links.naufalrf.net"
+
+[env.preview.vars]
+ADMIN_API_URL = "https://admin.naufalrf.net"
+BUN_VERSION = "1.4.3"
+PUBLIC_CURSOR_WS_URL = "wss://presence.naufalrf.net/ws"
+SITE_URL = "https://links.naufalrf.net"
