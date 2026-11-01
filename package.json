@@ -11,17 +11,18 @@
   },
   "dependencies": {
     "@astrojs/cloudflare": "12.6.13",
+    "@astrojs/node": "9.5.5",
     "@astrojs/react": "^4.4.2",
     "@astrojs/sitemap": "^3.7.0",
+    "@naufalrf/contracts": "workspace:*",
+    "@naufalrf/design-tokens": "workspace:*",
+    "@naufalrf/http": "workspace:*",
     "astro": "^5.17.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.575.0",
-    "tailwind-merge": "^3.5.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "@naufalrf/http": "workspace:*",
-    "@naufalrf/contracts": "workspace:*",
-    "@naufalrf/design-tokens": "workspace:*"
+    "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
     "wrangler": "4.156.0",
