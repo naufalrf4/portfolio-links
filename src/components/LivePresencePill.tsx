@@ -8,6 +8,9 @@ type PresenceParticipant = {
   id: string;
   name: string;
   color: string;
+  x: number;
+  y: number;
+  isTouching: boolean;
   pageLabel: string;
   sectionLabel: string | null;
 };
@@ -35,7 +38,7 @@ function getHealthUrl(socketUrl: string): string | null {
   try {
     const url = new URL(getSocketUrl(socketUrl));
     url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:';
-    url.pathname = '/health';
+    url.pathname = url.pathname.replace(/\/ws$/, '/health');
     url.search = '';
     url.hash = '';
     return url.toString();
@@ -94,13 +97,63 @@ export function LivePresencePill({ socketUrl, pagePath, pageLabel }: LivePresenc
   const [participants, setParticipants] = useState<PresenceParticipant[]>([]);
   const [selfId, setSelfId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [documentMetrics, setDocumentMetrics] = useState({ width: 0, height: 0, scrollX: 0, scrollY: 0 });
   const socketRef = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<number | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const shouldReconnectRef = useRef(false);
+  const lastMoveAtRef = useRef(0);
   const identity = useMemo(() => buildGuestIdentity(), []);
 
   useEffect(() => {
+    function updateMetrics() {
+      setDocumentMetrics({
+        width: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, window.innerWidth),
+        height: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, window.innerHeight),
+        scrollX: window.scrollX,
+        scrollY: window.scrollY,
+      });
+    }
+
+    updateMetrics();
+    window.addEventListener('resize', updateMetrics, { passive: true });
+    window.addEventListener('scroll', updateMetrics, { passive: true });
+    return () => {
+      window.removeEventListener('resize', updateMetrics);
+      window.removeEventListener('scroll', updateMetrics);
+    };
+  }, []);
+
+  useEffect(() => {
+    function sendMove(clientX: number, clientY: number, isTouching: boolean) {
+      const socket = socketRef.current;
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+      const now = performance.now();
+      if (now - lastMoveAtRef.current < 60) return;
+      lastMoveAtRef.current = now;
+      const width = Math.max(document.documentElement.scrollWidth, window.innerWidth);
+      const height = Math.max(document.documentElement.scrollHeight, window.innerHeight);
+      socket.send(JSON.stringify({
+        type: 'move',
+        payload: {
+          x: Math.min(1, Math.max(0, (clientX + window.scrollX) / width)),
+          y: Math.min(1, Math.max(0, (clientY + window.scrollY) / height)),
+          isTouching,
+          sectionId: null,
+          sectionLabel: null,
+        },
+      }));
+    }
+    const handlePointerMove = (event: PointerEvent) => sendMove(event.clientX, event.clientY, event.pointerType !== 'mouse');
+    const handlePointerDown = (event: PointerEvent) => sendMove(event.clientX, event.clientY, event.pointerType !== 'mouse');
+    const handleTouchMove = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (touch) sendMove(touch.clientX, touch.clientY, true);
+    };
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('pointerdown', handlePointerDown, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+
     function clearTimers() {
       if (heartbeatRef.current) {
         window.clearInterval(heartbeatRef.current);
@@ -223,6 +276,9 @@ export function LivePresencePill({ socketUrl, pagePath, pageLabel }: LivePresenc
     return () => {
       shouldReconnectRef.current = false;
       clearTimers();
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('touchmove', handleTouchMove);
       const activeSocket = socketRef.current;
       if (activeSocket?.readyState === WebSocket.OPEN) {
         activeSocket.send(JSON.stringify({ type: 'leave' }));
@@ -235,6 +291,27 @@ export function LivePresencePill({ socketUrl, pagePath, pageLabel }: LivePresenc
   }, [identity.color, identity.name, pageLabel, pagePath, socketUrl]);
 
   return (
+    <>
+    <div className="pointer-events-none fixed inset-0 z-[45] overflow-hidden" aria-hidden="true">
+      {participants.map((participant) => {
+        const x = participant.x * Math.max(documentMetrics.width, 1) - documentMetrics.scrollX;
+        const y = participant.y * Math.max(documentMetrics.height, 1) - documentMetrics.scrollY;
+        return (
+          <div key={`cursor-${participant.id}`} className="absolute left-0 top-0 transition-transform duration-75 ease-out" style={{ transform: `translate3d(${x}px, ${y}px, 0)` }}>
+            <div className="relative -translate-x-1/2 -translate-y-1/2">
+              <span className="absolute -inset-2 rounded-full blur-md" style={{ background: participant.color, opacity: 0.32 }} />
+              <svg className="relative h-6 w-6 drop-shadow" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2 L14.3 9.7 L22 12 L14.3 14.3 L12 22 L9.7 14.3 L2 12 L9.7 9.7 Z" fill={participant.color} />
+                <circle cx="12" cy="12" r="1.6" fill="white" />
+              </svg>
+              <span className="ml-4 whitespace-nowrap rounded-full border border-[var(--border)] bg-[var(--bg-card)] px-2 py-1 text-[10px] font-semibold text-[var(--text-primary)] shadow" style={{ borderColor: participant.color }}>
+                {participant.name}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
     <div className="fixed right-16 top-4 z-[52] flex justify-end md:right-[4.5rem] lg:bottom-8 lg:left-6 lg:right-auto lg:top-auto lg:justify-start">
       <div className="pointer-events-auto flex flex-col items-end gap-3 lg:items-start">
         <button
@@ -303,5 +380,6 @@ export function LivePresencePill({ socketUrl, pagePath, pageLabel }: LivePresenc
         ) : null}
       </div>
     </div>
+    </>
   );
 }

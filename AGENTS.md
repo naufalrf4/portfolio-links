@@ -56,5 +56,6 @@ Authoritative AI control contract for this repository.
 - `src/pages/index.astro` defines the current visual shell and should stay aligned with the shared dark-first design system from `@naufalrf/design-tokens`.
 - Social vs website link separation should use label/icon heuristics with normalized-URL deduplication rather than exact URL matching against `about.socialLinks`, because Admin link formatting can vary while still representing the same destination.
 - Links telemetry should stay same-origin through `src/pages/api/analytics.ts`; keep pageview and click tracking local to the app instead of sending browser traffic straight to the Admin domain.
+- The shared Presence route is reverse-proxied under `/presence`; health checks must replace the final `/ws` with `/health` while preserving that prefix, or the client will stop before opening its WebSocket.
 - `public/llms.txt` should follow the canonical section structure from `apps/public-astro/public/llms.txt`, but its content must stay specific to the links hub rather than duplicating the full portfolio narrative.
 - `astro.config.mjs` selects Cloudflare only when `CF_PAGES=1`; normal builds use `@astrojs/node` standalone for the parent's VPS rollback service. `Dockerfile` builds this repo independently for the VPS fallback runtime.
