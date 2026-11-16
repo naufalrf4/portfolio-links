@@ -30,10 +30,11 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     });
   } catch (error) {
     logger.error('Failed to track analytics event', error);
+    const invalidJson = error instanceof SyntaxError;
     return new Response(
-      JSON.stringify({ success: false, error: { message: 'Failed to track analytics event.' } }),
+      JSON.stringify({ success: false, error: { message: invalidJson ? 'Invalid JSON body.' : 'Failed to track analytics event.' } }),
       {
-        status: 500,
+        status: invalidJson ? 400 : 502,
         headers: {
           'Content-Type': 'application/json',
         },
