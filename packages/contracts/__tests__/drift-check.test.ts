@@ -42,6 +42,7 @@ const aboutFixture = {
     },
   ],
   socialLinks: [{ platform: 'github', url: 'https://github.com/naufalrf' }],
+  updatedAt: '2026-01-01T00:00:00.000Z',
 } satisfies AboutData;
 
 const projectListItemFixture = {
@@ -56,6 +57,7 @@ const projectListItemFixture = {
   imageUrl: null as string | null,
   featured: false,
   createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
   images: [
     {
       id: 'img-id',
@@ -81,6 +83,7 @@ const projectDetailFixture = {
   imageUrl: null as string | null,
   featured: false,
   createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
   projectDate: null as string | null,
   images: [
     {
