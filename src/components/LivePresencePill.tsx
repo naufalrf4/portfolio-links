@@ -6,6 +6,7 @@ type Status = 'connecting' | 'connected' | 'disconnected';
 
 type PresenceParticipant = {
   id: string;
+  roomId: string;
   name: string;
   color: string;
   x: number;
@@ -17,7 +18,9 @@ type PresenceParticipant = {
 
 type PresenceMessage =
   | { type: 'welcome'; payload: { selfId: string; roomId: string } }
-  | { type: 'overview'; payload: { participants: PresenceParticipant[] } };
+  | { type: 'overview'; payload: { participants: PresenceParticipant[] } }
+  | { type: 'pong' }
+  | { type: 'rejoin' };
 
 type LivePresencePillProps = {
   socketUrl: string;
@@ -26,9 +29,23 @@ type LivePresencePillProps = {
 };
 
 const HEARTBEAT_MS = 5000;
+const HEARTBEAT_TIMEOUT_MS = 20000;
 const RECONNECT_DELAY_MS = 5000;
 const HEALTHCHECK_TIMEOUT_MS = 1500;
 const SHARED_GUEST_KEY = 'portfolio-live-presence-guest';
+const CLIENT_ID_KEY = 'portfolio-live-presence-client-id';
+
+function getClientId() {
+  try {
+    const existing = window.sessionStorage.getItem(CLIENT_ID_KEY);
+    if (existing) return existing;
+    const clientId = window.crypto.randomUUID();
+    window.sessionStorage.setItem(CLIENT_ID_KEY, clientId);
+    return clientId;
+  } catch {
+    return window.crypto.randomUUID();
+  }
+}
 
 function getSocketUrl(socketUrl: string) {
   return socketUrl.trim() || 'ws://localhost:3006/ws';
@@ -125,6 +142,12 @@ export function LivePresencePill({ socketUrl, pagePath, pageLabel }: LivePresenc
   }, []);
 
   useEffect(() => {
+    let disposed = false;
+    let connectAttempt = 0;
+    let lastPongAt = 0;
+    const clientId = getClientId();
+    shouldReconnectRef.current = true;
+
     function sendMove(clientX: number, clientY: number, isTouching: boolean) {
       const socket = socketRef.current;
       if (!socket || socket.readyState !== WebSocket.OPEN) return;
@@ -167,16 +190,36 @@ export function LivePresencePill({ socketUrl, pagePath, pageLabel }: LivePresenc
 
     function scheduleReconnect() {
       clearTimers();
-      if (!shouldReconnectRef.current || reconnectTimeoutRef.current) return;
+      if (disposed || !shouldReconnectRef.current || reconnectTimeoutRef.current) return;
       reconnectTimeoutRef.current = window.setTimeout(() => {
         reconnectTimeoutRef.current = null;
         void connect();
       }, RECONNECT_DELAY_MS);
     }
 
+    function sendJoin(socket: WebSocket) {
+      socket.send(JSON.stringify({
+        type: 'join',
+        payload: {
+          roomId: 'links-home',
+          clientId,
+          name: identity.name,
+          color: identity.color,
+          x: 0.5,
+          y: 0.5,
+          isTouching: false,
+          pagePath,
+          pageLabel,
+          sectionId: null,
+          sectionLabel: null,
+        },
+      }));
+    }
+
     async function connect() {
+      if (disposed) return;
+      const attempt = ++connectAttempt;
       clearTimers();
-      shouldReconnectRef.current = true;
       setStatus('connecting');
 
       const healthUrl = getHealthUrl(socketUrl);
@@ -194,50 +237,50 @@ export function LivePresencePill({ socketUrl, pagePath, pageLabel }: LivePresenc
             throw new Error(`Presence health check failed with status ${response.status}`);
           }
         } catch {
-          setStatus('disconnected');
-          scheduleReconnect();
+          if (!disposed && attempt === connectAttempt && shouldReconnectRef.current) {
+            setStatus('disconnected');
+            scheduleReconnect();
+          }
           return;
         } finally {
           cleanup();
         }
       }
 
+      if (disposed || attempt !== connectAttempt || !shouldReconnectRef.current) return;
+
       const socket = new WebSocket(getSocketUrl(socketUrl));
       socketRef.current = socket;
 
       socket.addEventListener('open', () => {
-        if (socketRef.current !== socket) return;
+        if (disposed || attempt !== connectAttempt || socketRef.current !== socket) return;
         setStatus('connected');
-        socket.send(
-          JSON.stringify({
-            type: 'join',
-            payload: {
-              roomId: 'links-home',
-              name: identity.name,
-              color: identity.color,
-              x: 0.5,
-              y: 0.5,
-              isTouching: false,
-              pagePath,
-              pageLabel,
-              sectionId: null,
-              sectionLabel: null,
-            },
-          })
-        );
+        lastPongAt = Date.now();
+        sendJoin(socket);
 
         heartbeatRef.current = window.setInterval(() => {
-          if (socketRef.current === socket) {
-            socket.send(JSON.stringify({ type: 'ping' }));
+          if (disposed || attempt !== connectAttempt || socketRef.current !== socket) return;
+          if (Date.now() - lastPongAt > HEARTBEAT_TIMEOUT_MS) {
+            socket.close(4000, 'Heartbeat timeout');
+            return;
           }
+          socket.send(JSON.stringify({ type: 'ping' }));
         }, HEARTBEAT_MS);
       });
 
       socket.addEventListener('message', (event) => {
-        if (socketRef.current !== socket) return;
+        if (disposed || attempt !== connectAttempt || socketRef.current !== socket) return;
 
         try {
           const message = JSON.parse(event.data) as PresenceMessage;
+          if (message.type === 'pong') {
+            lastPongAt = Date.now();
+            return;
+          }
+          if (message.type === 'rejoin') {
+            sendJoin(socket);
+            return;
+          }
           if (message.type === 'welcome') {
             setSelfId(message.payload.selfId);
             return;
@@ -256,17 +299,16 @@ export function LivePresencePill({ socketUrl, pagePath, pageLabel }: LivePresenc
       });
 
       socket.addEventListener('close', () => {
-        if (socketRef.current === socket) {
-          socketRef.current = null;
-          setStatus('disconnected');
-        }
-
+        if (disposed || attempt !== connectAttempt || socketRef.current !== socket) return;
+        socketRef.current = null;
+        setStatus('disconnected');
         scheduleReconnect();
       });
 
       socket.addEventListener('error', () => {
-        if (socketRef.current === socket) {
+        if (!disposed && attempt === connectAttempt && socketRef.current === socket) {
           setStatus('disconnected');
+          socket.close();
         }
       });
     }
@@ -274,6 +316,8 @@ export function LivePresencePill({ socketUrl, pagePath, pageLabel }: LivePresenc
     void connect();
 
     return () => {
+      disposed = true;
+      connectAttempt += 1;
       shouldReconnectRef.current = false;
       clearTimers();
       window.removeEventListener('pointermove', handlePointerMove);
@@ -293,7 +337,7 @@ export function LivePresencePill({ socketUrl, pagePath, pageLabel }: LivePresenc
   return (
     <>
     <div className="pointer-events-none fixed inset-0 z-[45] overflow-hidden" aria-hidden="true">
-      {participants.map((participant) => {
+      {participants.filter((participant) => participant.roomId === 'links-home').map((participant) => {
         const x = participant.x * Math.max(documentMetrics.width, 1) - documentMetrics.scrollX;
         const y = participant.y * Math.max(documentMetrics.height, 1) - documentMetrics.scrollY;
         return (
