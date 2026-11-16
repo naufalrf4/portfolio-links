@@ -59,7 +59,6 @@ const formattedTitle = title === SITE_NAME ? SITE_NAME : `${title} - ${SITE_NAME
   <body class="bg-background text-foreground antialiased min-h-screen">
     <slot />
     <script is:inline>
-      {`
         (function () {
           if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
@@ -135,7 +134,6 @@ const formattedTitle = title === SITE_NAME ? SITE_NAME : `${title} - ${SITE_NAME
             });
           }, { passive: true });
         })();
-      `}
     </script>
   </body>
 </html>
